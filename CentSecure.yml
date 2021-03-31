@@ -1,0 +1,112 @@
+---
+- hosts: [groupA]
+  vars_prompt:
+    - name: grubpw
+      prompt: Enter a grub password to use on all machines (Make sure it is correct, there is no validation)
+      private: no
+  become: yes
+  become_user: root
+  become_method: sudo
+  tasks:
+
+    - name: Update system #CentOS
+      dnf:
+        name: '*'
+        state: latest
+
+# Step 11 of UT Checklist
+    - name: Install dnf-automatic #CentOS
+      dnf:
+        name: 'dnf-automatic'
+        state: latest
+
+    - name: Set upgrade type for dnf-automatic #CentOS
+      lineinfile:
+        path: /etc/dnf/automatic.conf
+        regexp: '^upgrade_type\s=\s'
+        line: upgrade_type = security
+
+    - name: Set emit method for dnf-automatic #CentOS
+      lineinfile:
+        path: /etc/dnf/automatic.conf
+        regexp: '^emit_via\s=\s'
+        line: emit_via = motd
+
+    - name: Start dnf-automatic service #CentOS
+      service:
+        name: dnf-automatic.timer
+        enabled: yes
+        state: started
+
+# Step 12 of UT Checklist
+    - name: Import gpg key #CentOS
+      rpm_key:
+        state: present
+        key: https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official
+      become_user: root
+
+# SECURE BOOT SETTINGS
+# Step 13 UT Checklist
+    - name: Set root only for grub.cfg #CentOS
+      file:
+        path: /boot/grub2/grub.cfg
+        owner: root
+        group: root
+        mode: '0600'
+
+# Step 14 UT Checklist
+    - name: Install pip #CentOS
+      dnf:
+        name: 'python3-pip'
+        state: latest
+
+    - name: Install pexpect
+      pip:
+        name: pexpect
+        state: latest
+        extra_args: --trusted-host pypi.python.org --trusted-host pypi.org --trusted-host files.pythonhosted.org
+
+    - name: Set boot loader password #CentOS
+      expect:
+        command: grub2-setpassword
+        responses:
+          (?i)password: '{{ grubpw }}'
+      no_log: True
+
+    - name: Update grub2-config #CentOS
+      command: grub2-mkconfig -o /boot/grub2/grub.cfg
+
+    - name: Remove pexpect
+      pip:
+        name: pexpect
+        state: absent
+
+    - name: Remove pip #CentOS
+      dnf:
+        name: 'python3-pip'
+        state: absent
+        autoremove: yes
+
+# Step 15 UT Checklist
+    - name: Remove the X window system
+      command: systemctl set-default multi-user.target
+
+# Step 16 UT Checklist
+    - name: Check if xfs service exists
+      stat: 'path=/etc/init.d/xfs'
+      register: servicestatus
+
+    - name: Disable X font server
+      service:
+        name: xfs
+        enabled: no
+        state: stopped
+      when: servicestatus.stat.exists
+
+#Message to state sys updates and secure boot config is done
+    - name: display complete message
+      debug:
+        msg: 1 -- Done with sys update and secure boot config
+
+- name: Start System Updates and Secure Boot Settings
+  import_playbook: CentSecure2.yml

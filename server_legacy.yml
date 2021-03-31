@@ -1,0 +1,6 @@
+---
+- name: Remove '{{ serverlegacyname }}'
+  dnf:
+    name: '{{ serverlegacyname }}'
+    state: absent
+  when: ansible_facts['distribution'] == "CentOS"

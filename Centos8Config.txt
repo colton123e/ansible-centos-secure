@@ -1,0 +1,38 @@
+- install dnf automatic and set upgrade type to security updates
+- set root only access on grub.cfg, set grub passwd
+- remove the X window system (with command: systemctl set-default multi-user.target)
+- stop the xfs font server if it exists
+
+- configure /etc/security/limits.conf for core dumps (add line "* hard core 0" to the file)
+- add "fs.suid_dumpable = 0" to /etc/sysctl.conf
+- configure /etc/profile so core dumps can't be made by setuid progs
+- enable randomized virtual memory region placement
+- remove legacy services if they exist (observation: they've never actually come up)
+- set daemon usmask value to 027
+- add authentication to single user mode (add "SINGLE=/sbin/sulogin" to /etc/sysconfig/init) [Observation: Might not actually be working since InsightVM still says this vulnerability exists.]
+- Enable crond and set root as the owner/group and set mode to og-rwx for cron tab, hourly, daily, weekly, monthly and cron.d
+
+- Set firewalld rule for SSH with enabled and permanent state and internal zone.
+- Block ICMP timestamp requests, timestamp replies
+- Disable IPv4 & IPv6 forwarding, redirects, source route, and redirects
+- Disable TCP timestamp responses
+- Disable IP forwards
+- Ignore broadcast replies
+- Enable bad message protection
+- Enable TCP SYN cookies
+
+- Set TZ to America/Chicago
+- Install and enable auditd
+- Add auth, account, password, and session warn to pam.d
+- Set password reuse policy
+- Set password requirements and expiration
+- Set SSH protocol to 2
+- SSH loglevel to INFO
+- SSH MaxAuthTries to 4
+- Configure "no" on: HostBasedAuthentication, PermitUserEnvironment, PermitRootLogin, PermitEmptyPasswords
+- Set ClientAliveInterval to 300
+- Set ClientAliveCountMax to 0
+- Set LoginGraceTime to 60 secs
+- Set SSH Warning banner
+- Set SSH MaxStartups to 10:30:60
+- Set SSH MaxSessions to 4
