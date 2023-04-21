@@ -6,17 +6,16 @@
   become_user: root
   become_method: sudo
   tasks:
-
-# SYSTEM INTEGRITY AND INTRUSION DETECTION
-# Step 40 of UT Checklist
+    # SYSTEM INTEGRITY AND INTRUSION DETECTION
+    # Step 40 of UT Checklist
     - name: Set Timezone
       community.general.timezone:
-        name: America/Chicago
+        name: America/Denver
 
-# Step 41 of UT Checklist
+    # Step 41 of UT Checklist
     - name: Install auditd (if it isn't already) #CentOS
       dnf:
-        name: 'audit'
+        name: "audit"
         state: latest
 
     - name: Enable auditd
@@ -25,35 +24,34 @@
         enabled: yes
         state: started
 
-# PAM CONFIGURATION
-# Step 46 of UT Checklist
+    # PAM CONFIGURATION
+    # Step 46 of UT Checklist
     - name: Add auth warn to pam.d config
       lineinfile:
         path: /etc/pam.d/other
-        line: 'auth required  pam_warn.so'
+        line: "auth required  pam_warn.so"
 
     - name: Add account warn to pam.d config
       lineinfile:
         path: /etc/pam.d/other
-        line: 'account required  pam_warn.so'
+        line: "account required  pam_warn.so"
 
     - name: Add password warn to pam.d config
       lineinfile:
         path: /etc/pam.d/other
-        line: 'password required  pam_warn.so'
+        line: "password required  pam_warn.so"
 
     - name: Add session warn to pam.d config
       lineinfile:
         path: /etc/pam.d/other
-        line: 'session required  pam_warn.so'
+        line: "session required  pam_warn.so"
 
     - name: Set password reuse policy #CentOS
       lineinfile:
         path: /etc/pam.d/system-auth
         insertafter: 's*password\s+(requisite|sufficient)\s+(pwhistory\.so|pam_unix\.so)\s+(\S+\s+).*?\n'
-        line: 'password    sufficient    pam_unix.so try_first_pass use_authtok nullok sha512 shadow remember=5'
+        line: "password    sufficient    pam_unix.so try_first_pass use_authtok nullok sha512 shadow remember=5"
         regexp: 's*password\s+(requisite|sufficient)\s+(pwhistory\.so|pam_unix\.so)\s+(\S+\s+).*?\n'
-
 
     - name: Set password requirements
       blockinfile:
@@ -70,11 +68,11 @@
       blockinfile:
         path: /etc/login.defs
         block: |
-           PASS_MAX_DAYS 365
-           PASS_MIN_DAYS 7
-           PASS_WARN_AGE 30
+          PASS_MAX_DAYS 365
+          PASS_MIN_DAYS 7
+          PASS_WARN_AGE 30
 
-## INSIGHT VM INSTALL
+    ## INSIGHT VM INSTALL
     - name: Install unarchiver #CentOS
       dnf:
         name:
@@ -95,86 +93,86 @@
         mode: u+x
       when: needIVM == True
 
-# REMOTE ADMINISTRATION VIA SSH
-# Step 33 of UT Checklist
+    # REMOTE ADMINISTRATION VIA SSH
+    # Step 33 of UT Checklist
     - name: Set SSH protocol to 2
       lineinfile:
         path: /etc/ssh/sshd_config
-        line: 'Protocol 2'
+        line: "Protocol 2"
 
-# Step 34 of UT Checklist
+    # Step 34 of UT Checklist
     - name: Set SSH loglevel to INFO
       lineinfile:
         path: /etc/ssh/sshd_config
-        line: 'LogLevel INFO'
+        line: "LogLevel INFO"
         regexp: '^#LogLevel\s'
 
     - name: Set SSH MaxAuthTries to 4
       lineinfile:
         path: /etc/ssh/sshd_config
-        line: 'MaxAuthTries 4'
+        line: "MaxAuthTries 4"
         regexp: '^#MaxAuthTries\s'
 
     - name: Set HostbasedAuthentication to no
       lineinfile:
         path: /etc/ssh/sshd_config
-        line: 'HostbasedAuthentication no'
+        line: "HostbasedAuthentication no"
         regexp: '^#HostbasedAuthentication\s'
 
     - name: Set PermitUserEnvironment to no
       lineinfile:
         path: /etc/ssh/sshd_config
-        line: 'PermitUserEnvironment no'
+        line: "PermitUserEnvironment no"
         regexp: '^#PermitUserEnvironment\s'
 
     - name: Set ClientAliveInterval
       lineinfile:
         path: /etc/ssh/sshd_config
-        line: 'ClientAliveInterval 300'
+        line: "ClientAliveInterval 300"
         regexp: '^#ClientAliveInterval\s'
 
     - name: Set ClientAliveCountMax
       lineinfile:
         path: /etc/ssh/sshd_config
-        line: 'ClientAliveCountMax 0'
+        line: "ClientAliveCountMax 0"
         regexp: '^#ClientAliveCountMax\s'
 
     - name: Set LoginGraceTime to one minute
       lineinfile:
         path: /etc/ssh/sshd_config
-        line: 'LoginGraceTime 60'
+        line: "LoginGraceTime 60"
         regexp: '^#LoginGraceTime\s'
 
     - name: Set SSH warning banner
       lineinfile:
         path: /etc/ssh/sshd_config
-        line: 'Banner /etc/issue.net'
+        line: "Banner /etc/issue.net"
         regexp: '^#Banner\s'
 
     - name: Set SSH MaxStartups
       lineinfile:
         path: /etc/ssh/sshd_config
-        line: 'MaxStartups 10:30:60'
+        line: "MaxStartups 10:30:60"
         regexp: '^#MaxStartups\s'
 
     - name: Set SSH MaxSessions
       lineinfile:
         path: /etc/ssh/sshd_config
-        line: 'MaxSessions 4'
+        line: "MaxSessions 4"
         regexp: '^#MaxSessions\s'
 
-# Step 35 of UT Checklist
+    # Step 35 of UT Checklist
     - name: Disable root SSH login
       lineinfile:
         path: /etc/ssh/sshd_config
-        line: 'PermitRootLogin no'
+        line: "PermitRootLogin no"
         regexp: '^PermitRootLogin\s'
 
-# Step 36 of UT Checklist
+    # Step 36 of UT Checklist
     - name: Set SSH permitemptypasswords to no
       lineinfile:
         path: /etc/ssh/sshd_config
-        line: 'PermitEmptyPasswords no'
+        line: "PermitEmptyPasswords no"
         regexp: '^#PermitEmptyPasswords\s'
 
     - name: Restart sshd
@@ -189,7 +187,7 @@
     - name: Reboot machine(s)
       reboot:
 
-#Message to state this set of tasks is complete
+    #Message to state this set of tasks is complete
     - name: display complete message
       debug:
         msg: 4 -- Done with System Integrity

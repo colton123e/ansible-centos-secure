@@ -4,17 +4,16 @@
   become_user: root
   become_method: sudo
   tasks:
-
-# Step 17 of UT Checklist
+    # Step 17 of UT Checklist
     - name: Configure /etc/security/limits.conf for core dumps
       lineinfile:
         path: /etc/security/limits.conf
-        line: '* hard core 0'
+        line: "* hard core 0"
 
     - name: Configure /etc/sysctl.conf
       lineinfile:
         path: /etc/sysctl.conf
-        line: 'fs.suid_dumpable = 0'
+        line: "fs.suid_dumpable = 0"
 
     - name: Reload sysctl config
       command: sysctl -p
@@ -22,17 +21,17 @@
     - name: Configure so core dumps can't be made by setuid progs
       lineinfile:
         path: /etc/profile
-        line: 'ulimit -S -c 0 > /dev/null 2>&1'
+        line: "ulimit -S -c 0 > /dev/null 2>&1"
 
-# Step 18 of UT Checklist
+    # Step 18 of UT Checklist
     - name: Enable randomized virtual memory region placement
       lineinfile:
         path: /etc/sysctl.conf
-        line: 'kernel.randomize_va_space = 2'
+        line: "kernel.randomize_va_space = 2"
 
-# OS HARDENING
-# Step 19 of UT Checklist
-#	telnet-server; ypserv, ypbind; tftp, tftp-server
+    # OS HARDENING
+    # Step 19 of UT Checklist
+    #	telnet-server; ypserv, ypbind; tftp, tftp-server
     - include_tasks: server_legacy.yml
       with_items:
         - telnet-server
@@ -43,9 +42,9 @@
       loop_control:
         loop_var: serverlegacyname
 
-# Step 21 of UT Checklist
+    # Step 21 of UT Checklist
     - name: Check if xinetd service exists
-      stat: 'path=/etc/init.d/xinetd'
+      stat: "path=/etc/init.d/xinetd"
       register: servicestatus
 
     - name: Stop xinetd if present
@@ -59,12 +58,12 @@
       command: chkconfig xinetd off
       when: servicestatus.stat.exists
 
-# Step 20 of UT Checklist
+    # Step 20 of UT Checklist
     - name: Disable xinetd services
       command: chkconfig off
       when: servicestatus.stat.exists
 
-# Disable legacy services
+    # Disable legacy services
     - include_tasks: server_services.yml
       with_items:
         - chargen-dgram
@@ -77,8 +76,8 @@
       loop_control:
         loop_var: serverservicename
 
-# Disable untilized services
-# FTP, DNS, SMB, DHCP, NFS, SNMP
+    # Disable untilized services
+    # FTP, DNS, SMB, DHCP, NFS, SNMP
     - include_tasks: server_services.yml
       with_items:
         - FTP
@@ -90,12 +89,12 @@
       loop_control:
         loop_var: serverservicename
 
-# Step 24 of UT Checklist
-    - name: Change daemon umask value #CentOS
-      lineinfile:
-        path: /etc/init.d/functions
-        regexp: '^umask'
-        line: 'umask 027'
+    # Step 24 of UT Checklist
+    # - name: Change daemon umask value #CentOS
+    #   lineinfile:
+    #     path: /etc/init.d/functions
+    #     regexp: '^umask'
+    #     line: 'umask 027'
 
     - name: Add authentication to single user mode
       lineinfile:
@@ -103,7 +102,7 @@
         create: yes
         line: "SINGLE=/sbin/sulogin"
 
-# Cron stuff
+    # Cron stuff
     - name: Ensure crond is enabled
       systemd:
         name: crond
@@ -152,7 +151,7 @@
         group: root
         mode: og-rwx
 
-#Message to state these set of tasks are complete
+    #Message to state these set of tasks are complete
     - name: display complete message
       debug:
         msg: 2 -- Done with Process and OS Hardening

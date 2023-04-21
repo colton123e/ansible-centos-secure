@@ -31,3 +31,6 @@ ansible-playbook -i [host-filename] [playbook-name] -kKe "needIVM=false"
 Example:
 
 ansible-playbook -i hosts CentSecure.yml -kKe "needIVM=false"
+
+Using SSH Key based authentication:
+ansible-playbook -i hosts CentSecure.yml -Ke "needIVM=false"

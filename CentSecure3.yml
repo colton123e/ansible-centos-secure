@@ -4,9 +4,8 @@
   become_user: root
   become_method: sudo
   tasks:
-
-# NETWORK SECURITY AND FIREWALL CONFIG
-# Step 25 of UT Checklist
+    # NETWORK SECURITY AND FIREWALL CONFIG
+    # Step 25 of UT Checklist
     - name: Configure the firewall #CentOS
       ansible.posix.firewalld:
         state: enabled
@@ -29,125 +28,123 @@
         permanent: yes
         immediate: yes
 
-# Step 26 of UT Checklist
+    # Step 26 of UT Checklist
     - name: Disable IPv4 forwarding
       sysctl:
         name: net.ipv4.conf.all.forwarding
-        value: '0'
+        value: "0"
 
     - name: Disable IPv6 forwarding
       sysctl:
         name: net.ipv6.conf.all.forwarding
-        value: '0'
+        value: "0"
 
-# Step 27 of UT Checklist
+    # Step 27 of UT Checklist
 
     - name: Disable IPv4 send redirects
       sysctl:
         name: net.ipv4.conf.all.send_redirects
-        value: '0'
+        value: "0"
 
-
-# Step 28 of UT Checklist
+    # Step 28 of UT Checklist
     - name: Disable IPv4 accept all source route
       sysctl:
         name: net.ipv4.conf.all.accept_source_route
-        value: '0'
+        value: "0"
 
-#    - name: Disable IPv4 accept default source route
-#      sysctl:
-#        name: net.ipv4.conf.defualt.accept_source_route
-#        value: '0'
+    #    - name: Disable IPv4 accept default source route
+    #      sysctl:
+    #        name: net.ipv4.conf.defualt.accept_source_route
+    #        value: '0'
 
     - name: Disable IPv6 accept all source route
       sysctl:
         name: net.ipv6.conf.all.accept_source_route
-        value: '0'
+        value: "0"
 
     - name: Disable IPv6 accept default source route
       sysctl:
         name: net.ipv6.conf.default.accept_source_route
-        value: '0'
+        value: "0"
 
-
-# Step 29 of UT Checklist
+    # Step 29 of UT Checklist
     - name: Disable ICMP redirect acceptance ipv4
       sysctl:
         name: net.ipv4.conf.all.accept_redirects
-        value: '0'
+        value: "0"
 
     - name: Disable ICMP default redirect acceptance ipv4
       sysctl:
         name: net.ipv4.conf.default.accept_redirects
-        value: '0'
+        value: "0"
 
     - name: Disable ICMP default redirect acceptance ipv6
       sysctl:
         name: net.ipv6.conf.default.accept_redirects
-        value: '0'
+        value: "0"
 
     - name: Disable ICMP secure redirect acceptance ipv4
       sysctl:
         name: net.ipv4.conf.all.secure_redirects
-        value: '0'
+        value: "0"
         sysctl_set: yes
 
     - name: Disable ICMP default secure redirect acceptance ipv4
       sysctl:
         name: net.ipv4.conf.default.secure_redirects
-        value: '0'
+        value: "0"
         sysctl_set: yes
 
     - name: Disable  default send redirects ipv4
       sysctl:
         name: net.ipv4.conf.default.send_redirects
-        value: '0'
+        value: "0"
 
     - name: Disable ICMP default redirect acceptance ipv6
       sysctl:
         name: net.ipv6.conf.all.accept_redirects
-        value: '0'
+        value: "0"
 
     - name: Disable TCP timestamp responses
       sysctl:
         name: net.ipv4.tcp_timestamps
-        value: '0'
+        value: "0"
 
     - name: Disable ip forwards
       sysctl:
         name: net.ipv4.ip_forward
-        value: '0'
+        value: "0"
 
-# Step 30 of UT Checklist
+    # Step 30 of UT Checklist
     - name: Enable ignore broadcast replies
       sysctl:
         name: net.ipv4.icmp_echo_ignore_broadcasts
-        value: '1'
+        value: "1"
 
-# Step 31 of UT Checklist
+    # Step 31 of UT Checklist
     - name: Enable bad error message protection
       sysctl:
         name: net.ipv4.icmp_ignore_bogus_error_responses
-        value: '1'
+        value: "1"
 
-# Step 32 of UT Checklist
+    # Step 32 of UT Checklist
     - name: Enable TCP SYN cookies
       sysctl:
         name: net.ipv4.tcp_syncookies
-        value: '1'
+        value: "1"
         reload: yes
 
     - name: Ipv4 route flush set to 1
       sysctl:
         name: net.ipv4.route.flush
-        value: '1'
+        value: "1"
 
-    - name: Ipv6 route flush set to 1
-      sysctl:
-        name: net.ipv6.route.flush
-        value: '1'
+    # - name: Ipv6 route flush set to 1
+    #   sysctl:
+    #     name: net.ipv6.route.flush
+    #     value: '1'
 
-#Message to state this set of tasks is complete
+    #Message to state this set of tasks is complete
     - name: display complete message
       debug:
         msg: 3 -- Done with Network Security, Firewall, and Remote Admin Config

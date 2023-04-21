@@ -8,16 +8,15 @@
   become_user: root
   become_method: sudo
   tasks:
-
     - name: Update system #CentOS
       dnf:
-        name: '*'
+        name: "*"
         state: latest
 
-# Step 11 of UT Checklist
+    # Step 11 of UT Checklist
     - name: Install dnf-automatic #CentOS
       dnf:
-        name: 'dnf-automatic'
+        name: "dnf-automatic"
         state: latest
 
     - name: Set upgrade type for dnf-automatic #CentOS
@@ -38,26 +37,26 @@
         enabled: yes
         state: started
 
-# Step 12 of UT Checklist
-    - name: Import gpg key #CentOS
-      rpm_key:
-        state: present
-        key: https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official
-      become_user: root
+    # # Step 12 of UT Checklist
+    #     - name: Import gpg key #CentOS
+    #       rpm_key:
+    #         state: present
+    #         key: https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official
+    #       become_user: root
 
-# SECURE BOOT SETTINGS
-# Step 13 UT Checklist
+    # SECURE BOOT SETTINGS
+    # Step 13 UT Checklist
     - name: Set root only for grub.cfg #CentOS
       file:
         path: /boot/grub2/grub.cfg
         owner: root
         group: root
-        mode: '0600'
+        mode: "0600"
 
-# Step 14 UT Checklist
+    # Step 14 UT Checklist
     - name: Install pip #CentOS
       dnf:
-        name: 'python3-pip'
+        name: "python3-pip"
         state: latest
 
     - name: Install pexpect
@@ -70,7 +69,7 @@
       expect:
         command: grub2-setpassword
         responses:
-          (?i)password: '{{ grubpw }}'
+          (?i)password: "{{ grubpw }}"
       no_log: True
 
     - name: Update grub2-config #CentOS
@@ -83,17 +82,17 @@
 
     - name: Remove pip #CentOS
       dnf:
-        name: 'python3-pip'
+        name: "python3-pip"
         state: absent
         autoremove: yes
 
-# Step 15 UT Checklist
+    # Step 15 UT Checklist
     - name: Remove the X window system
       command: systemctl set-default multi-user.target
 
-# Step 16 UT Checklist
+    # Step 16 UT Checklist
     - name: Check if xfs service exists
-      stat: 'path=/etc/init.d/xfs'
+      stat: "path=/etc/init.d/xfs"
       register: servicestatus
 
     - name: Disable X font server
@@ -103,7 +102,7 @@
         state: stopped
       when: servicestatus.stat.exists
 
-#Message to state sys updates and secure boot config is done
+    #Message to state sys updates and secure boot config is done
     - name: display complete message
       debug:
         msg: 1 -- Done with sys update and secure boot config
