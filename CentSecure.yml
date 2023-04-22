@@ -75,10 +75,10 @@
     - name: Update grub2-config #CentOS
       command: grub2-mkconfig -o /boot/grub2/grub.cfg
 
-    - name: Remove pexpect
-      pip:
-        name: pexpect
-        state: absent
+    # - name: Remove pexpect
+    #   pip:
+    #     name: pexpect
+    #     state: absent
 
     - name: Remove pip #CentOS
       dnf:
