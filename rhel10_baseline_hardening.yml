@@ -1,0 +1,414 @@
+---
+- name: RHEL 9/10 baseline hardening (SIEM-friendly)
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    # Option to reboot the server after configurations are made.
+    do_reboot: false
+
+    # If true, only apply security updates. If false, apply all updates.
+    security_updates_only: false
+
+    # Password policy
+    pw_minlen: 12
+    pw_minclass: 3
+    pw_lcredit: -1
+    pw_ucredit: -1
+    pw_dcredit: -1
+    pw_history_remember: 5
+
+    # SSH policy (adjust as desired)
+    ssh_hardening:
+      LogLevel: "INFO"
+      MaxAuthTries: "4"
+      HostbasedAuthentication: "no"
+      PermitUserEnvironment: "no"
+      ClientAliveInterval: "300"
+      ClientAliveCountMax: "0"
+      LoginGraceTime: "60"
+      MaxStartups: "10:30:60"
+      MaxSessions: "4"
+      PermitRootLogin: "no"
+      PermitEmptyPasswords: "no"
+      Banner: "/etc/issue.net"
+
+    # Basic service/package cleanup (safe list; extend as you like)
+    remove_packages:
+      - telnet-server
+      - ypserv
+      - ypbind
+      - tftp
+      - tftp-server
+      - xinetd
+
+    disable_services_if_present:
+      - xinetd
+
+  handlers:
+    - name: reload sysctl
+      ansible.builtin.command: sysctl --system
+      changed_when: false
+
+    - name: restart sshd
+      ansible.builtin.service:
+        name: sshd
+        state: restarted
+
+    - name: reboot host
+      ansible.builtin.reboot:
+      when: do_reboot | bool
+
+  pre_tasks:
+    - name: Assert RHEL-family
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.os_family == "RedHat"
+        fail_msg: "This playbook targets RHEL/Rocky/Alma only."
+
+    - name: Assert major version supported (9+ recommended)
+      ansible.builtin.assert:
+        that:
+          - (ansible_facts.distribution_major_version | int) >= 9
+        fail_msg: "This playbook expects RHEL/Rocky/Alma 9 or newer."
+
+  tasks:
+    # -----------------------------
+    # Updates
+    # -----------------------------
+    - name: Update system packages (all updates)
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+        update_cache: true
+      when: not security_updates_only | bool
+      register: dnf_update_all
+
+    - name: Update system packages (security updates only)
+      ansible.builtin.dnf:
+        name: "*"
+        security: true
+        state: latest
+        update_cache: true
+      when: security_updates_only | bool
+      register: dnf_update_sec
+
+    # -----------------------------
+    # dnf-automatic (security updates)
+    # -----------------------------
+    - name: Install dnf-automatic
+      ansible.builtin.dnf:
+        name: dnf-automatic
+        state: present
+
+    - name: Configure dnf-automatic upgrade_type=security
+      ansible.builtin.ini_file:
+        path: /etc/dnf/automatic.conf
+        section: commands
+        option: upgrade_type
+        value: security
+
+    - name: Configure dnf-automatic emit_via=motd
+      ansible.builtin.ini_file:
+        path: /etc/dnf/automatic.conf
+        section: emitters
+        option: emit_via
+        value: motd
+
+    - name: Enable and start dnf-automatic timer
+      ansible.builtin.systemd:
+        name: dnf-automatic.timer
+        enabled: true
+        state: started
+
+    # -----------------------------
+    # Core dumps hardening
+    # -----------------------------
+    - name: Disable core dumps via limits.d
+      ansible.builtin.copy:
+        dest: /etc/security/limits.d/99-core-dumps.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          * hard core 0
+
+    - name: Disable core dumps via profile.d
+      ansible.builtin.copy:
+        dest: /etc/profile.d/99-no-coredumps.sh
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          # Disable core dumps for interactive shells
+          ulimit -S -c 0 >/dev/null 2>&1 || true
+
+    # -----------------------------
+    # Sysctl hardening (single managed file)
+    # -----------------------------
+    - name: Install sysctl hardening file
+      ansible.builtin.copy:
+        dest: /etc/sysctl.d/99-hardening.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          # Core dump controls
+          fs.suid_dumpable = 0
+          kernel.randomize_va_space = 2
+
+          # Routing / forwarding
+          net.ipv4.ip_forward = 0
+          net.ipv4.conf.all.forwarding = 0
+          net.ipv6.conf.all.forwarding = 0
+
+          # Redirects / source routes
+          net.ipv4.conf.all.send_redirects = 0
+          net.ipv4.conf.default.send_redirects = 0
+          net.ipv4.conf.all.accept_redirects = 0
+          net.ipv4.conf.default.accept_redirects = 0
+          net.ipv4.conf.all.secure_redirects = 0
+          net.ipv4.conf.default.secure_redirects = 0
+          net.ipv6.conf.all.accept_redirects = 0
+          net.ipv6.conf.default.accept_redirects = 0
+          net.ipv4.conf.all.accept_source_route = 0
+          net.ipv6.conf.all.accept_source_route = 0
+          net.ipv6.conf.default.accept_source_route = 0
+
+          # TCP hardening-ish
+          net.ipv4.tcp_timestamps = 0
+          net.ipv4.tcp_syncookies = 1
+
+          # ICMP hardening-ish
+          net.ipv4.icmp_echo_ignore_broadcasts = 1
+          net.ipv4.icmp_ignore_bogus_error_responses = 1
+      notify: reload sysctl
+
+    # -----------------------------
+    # firewalld (apply rules to ACTIVE zone)
+    # -----------------------------
+    - name: Ensure firewalld enabled and running
+      ansible.builtin.systemd:
+        name: firewalld
+        enabled: true
+        state: started
+
+    - name: Detect active firewalld zone (first active zone)
+      ansible.builtin.command: firewall-cmd --get-active-zones
+      register: fw_active_zones
+      changed_when: false
+
+    - name: Set active zone fact
+      ansible.builtin.set_fact:
+        fw_zone: "{{ (fw_active_zones.stdout_lines[0] | default('public')).split()[0] }}"
+
+    - name: Ensure SSH service allowed in active zone
+      ansible.posix.firewalld:
+        service: ssh
+        zone: "{{ fw_zone }}"
+        permanent: true
+        state: enabled
+        immediate: true
+
+    - name: Block ICMP timestamp-request (IPv4)
+      ansible.posix.firewalld:
+        rich_rule: 'rule family="ipv4" icmp-type name="timestamp-request" drop'
+        zone: "{{ fw_zone }}"
+        permanent: true
+        state: enabled
+        immediate: true
+
+    - name: Block ICMP timestamp-reply (IPv4)
+      ansible.posix.firewalld:
+        rich_rule: 'rule family="ipv4" icmp-type name="timestamp-reply" drop'
+        zone: "{{ fw_zone }}"
+        permanent: true
+        state: enabled
+        immediate: true
+
+    # -----------------------------
+    # auditd
+    # -----------------------------
+    - name: Ensure audit package present
+      ansible.builtin.dnf:
+        name: audit
+        state: present
+
+    - name: Enable and start auditd
+      ansible.builtin.systemd:
+        name: auditd
+        enabled: true
+        state: started
+
+    # -----------------------------
+    # Password policy settings
+    # -----------------------------
+    - name: Configure pwquality.conf
+      ansible.builtin.blockinfile:
+        path: /etc/security/pwquality.conf
+        create: true
+        marker: "# {mark} ANSIBLE MANAGED - hardening"
+        block: |
+          minlen = {{ pw_minlen }}
+          minclass = {{ pw_minclass }}
+          lcredit = {{ pw_lcredit }}
+          ucredit = {{ pw_ucredit }}
+          dcredit = {{ pw_dcredit }}
+
+    - name: Configure pwhistory.conf (pam_pwhistory settings)
+      ansible.builtin.blockinfile:
+        path: /etc/security/pwhistory.conf
+        create: true
+        marker: "# {mark} ANSIBLE MANAGED - hardening"
+        block: |
+          remember = {{ pw_history_remember }}
+          enforce_for_root
+
+    - name: Configure login.defs password aging
+      ansible.builtin.blockinfile:
+        path: /etc/login.defs
+        marker: "# {mark} ANSIBLE MANAGED - hardening"
+        block: |
+          PASS_MAX_DAYS 365
+          PASS_MIN_DAYS 7
+          PASS_WARN_AGE 30
+
+    - name: Check authselect current profile
+      ansible.builtin.command: authselect current
+      register: authselect_current
+      changed_when: false
+      failed_when: false
+
+    - name: Enable authselect feature with-pwhistory (if authselect exists)
+      ansible.builtin.command: authselect enable-feature with-pwhistory
+      register: authselect_enable_pwhistory
+      changed_when: "'Enabled' in authselect_enable_pwhistory.stdout or authselect_enable_pwhistory.rc == 0"
+      failed_when: false
+      when: authselect_current.rc == 0
+
+    - name: Apply authselect changes
+      ansible.builtin.command: authselect apply-changes
+      changed_when: false
+      failed_when: false
+      when: authselect_current.rc == 0
+
+    # -----------------------------
+    # SSH hardening
+    # -----------------------------
+    - name: Ensure sshd_config.d exists
+      ansible.builtin.file:
+        path: /etc/ssh/sshd_config.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Install ssh hardening drop-in
+      ansible.builtin.copy:
+        dest: /etc/ssh/sshd_config.d/00-hardening.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          {% for k, v in ssh_hardening.items() %}
+          {{ k }} {{ v }}
+          {% endfor %}
+      notify: restart sshd
+
+    # -----------------------------
+    # Cron perms
+    # -----------------------------
+    - name: Ensure crond enabled
+      ansible.builtin.systemd:
+        name: crond
+        enabled: true
+        state: started
+
+    - name: Ensure cron permissions (directories)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        owner: root
+        group: root
+        mode: "0700"
+      loop:
+        - /etc/cron.hourly
+        - /etc/cron.daily
+        - /etc/cron.weekly
+        - /etc/cron.monthly
+        - /etc/cron.d
+
+    - name: Ensure /etc/crontab permissions
+      ansible.builtin.file:
+        path: /etc/crontab
+        owner: root
+        group: root
+        mode: "0600"
+
+    # -----------------------------
+    # Remove legacy packages and disable legacy services (systemd-native)
+    # -----------------------------
+    - name: Remove legacy/unneeded packages
+      ansible.builtin.dnf:
+        name: "{{ remove_packages }}"
+        state: absent
+
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Disable services if present
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: false
+        state: stopped
+      when: item in ansible_facts.services
+      loop: "{{ disable_services_if_present }}"
+
+    # -----------------------------
+    # Systemd rescue/emergency authentication (modern replacement for /etc/sysconfig/init)
+    # -----------------------------
+    - name: Create systemd drop-in directories for sulogin
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop:
+        - /etc/systemd/system/rescue.service.d
+        - /etc/systemd/system/emergency.service.d
+
+    - name: Require sulogin in rescue mode
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/rescue.service.d/override.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Service]
+          ExecStart=
+          ExecStart=-/usr/lib/systemd/systemd-sulogin-shell rescue
+      notify: reboot host
+
+    - name: Require sulogin in emergency mode
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/emergency.service.d/override.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Service]
+          ExecStart=
+          ExecStart=-/usr/lib/systemd/systemd-sulogin-shell emergency
+      notify: reboot host
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg:
+          - "Hardening applied. Active firewalld zone: {{ fw_zone }}"
+          - "SELinux untouched (expected enforcing)."
+          - "Reboot will run only if do_reboot=true (currently {{ do_reboot }})."
